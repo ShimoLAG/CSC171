@@ -1,4 +1,4 @@
-import pygame
+import pygame, random
 
 pygame.init()
 Height = 700
@@ -16,6 +16,9 @@ EnemyLocations = [(0, 0), (1, 0), (2, 0), (3, 0)]
 
 Player = ["General", "Bomb", "Flag", "Soldier"]
 PlayerLocations = [(0, 3), (1, 3), (2, 3), (3, 3)]
+
+random.shuffle(EnemyLocations)
+random.shuffle(PlayerLocations)
 
 CapturedEnemy = []
 CapturedPlayer = []
@@ -201,6 +204,11 @@ def check_win():
         return "Enemy"
     if 'Flag' not in Enemy:
         return "Player"
+    
+    if len(Player) == 1 and 'Flag' in Player and len(Enemy) == 1 and 'Flag' in Enemy:
+        print("It's a draw! Both flags are captured.")
+        pygame.quit()
+        exit() 
 
     if len(Player) == 1 and 'Flag' in Player:
         return "Enemy"
