@@ -19,6 +19,7 @@ PlayerLocations = [(0, 3), (1, 3), (2, 3), (3, 3)]
 
 CapturedEnemy = []
 CapturedPlayer = []
+RevealedPlayerPieces = []  # Tracks revealed player pieces
 
 turn = 0
 selection = 100
@@ -62,8 +63,8 @@ PlayerImages = [PlayerGeneral, PlayerBomb, PlayerFlag, PlayerSoldier]
 piece_list = ['General', 'Bomb', 'Flag', 'Soldier']
 
 combat_hierarchy = {
-    'General': {'wins': ['Bomb', 'Soldier', 'Flag'], 'loses': []},  # General wins against Bomb
-    'Bomb': {'wins': ['Soldier', 'Flag'], 'loses': ['General']},  # Bomb loses to General
+    'General': {'wins': ['Bomb', 'Soldier', 'Flag'], 'loses': []},
+    'Bomb': {'wins': ['Soldier', 'Flag'], 'loses': ['General']},
     'Flag': {'wins': [], 'loses': ['General', 'Soldier', 'Bomb']},
     'Soldier': {'wins': ['Bomb', 'Flag'], 'loses': ['General']}
 }
@@ -93,7 +94,7 @@ def draw_pieces():
     for i in range(len(Enemy)):
         if Enemy[i] in piece_list:
             index = piece_list.index(Enemy[i])
-            if turn % 2 == 0:  # Player's turn
+            if turn % 2 == 0:
                 Screen.blit(Hidden, (EnemyLocations[i][0] * 100 + 10, EnemyLocations[i][1] * 100 + 10))
             else:
                 Screen.blit(EnemyImages[index], (EnemyLocations[i][0] * 100 + 10, EnemyLocations[i][1] * 100 + 10))
@@ -115,7 +116,7 @@ def check_move(position, player):
         own_list = EnemyLocations
         enemy_list = PlayerLocations
 
-    directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]  # Down, Up, Right, Left
+    directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
     for dx, dy in directions:
         new_pos = (position[0] + dx, position[1] + dy)
         if 0 <= new_pos[0] <= 3 and 0 <= new_pos[1] <= 3:
@@ -124,26 +125,21 @@ def check_move(position, player):
     return moves_list
 
 def resolve_combat(attacker, defender):
-    # If both pieces are the same, it's a draw (both are removed)
     if attacker == defender:
         return 'both'
 
-    # Bomb attacking (Bomb wins against General and Soldier, unless it's attacking Flag)
     if attacker == 'Bomb' and defender != 'Flag':
-        return 'attacker'  # Bomb wins when attacking General or Soldier
+        return 'attacker'
 
-    # Bomb defending (Bomb loses when attacked by General or Soldier)
     if defender == 'Bomb' and attacker in ['General', 'Soldier']:
-        return 'attacker'  # Bomb loses when attacked by General or Soldier
+        return 'attacker'
 
-    # General behavior: General defeats Bomb and Soldier, and can't be defeated by Bomb
     if attacker == 'General' and defender == 'Bomb':
-        return 'defender'  # General loses to Bomb when attacking
+        return 'defender'
 
     if defender == 'General' and attacker == 'Bomb':
-        return 'attacker'  # Bomb wins when attacking General
+        return 'attacker'
 
-    # Normal combat resolution for other pieces based on combat hierarchy
     if defender in combat_hierarchy[attacker]['wins']:
         return 'attacker'
     if defender in combat_hierarchy[attacker]['loses']:
@@ -151,21 +147,18 @@ def resolve_combat(attacker, defender):
 
     return None
 
-
-
-
-
 def capture_logic(attacker_index, attacker_list, attacker_locations, defender_index, defender_list, defender_locations):
+    global RevealedPlayerPieces
+
     result = resolve_combat(attacker_list[attacker_index], defender_list[defender_index])
 
-    # Capture logic based on combat result
     if result == 'attacker':
         captured_piece = defender_list[defender_index]
-        captured_location = defender_locations[defender_index]  # Store the defender's location
+        RevealedPlayerPieces.append(captured_piece)  # Record the revealed piece
+        captured_location = defender_locations[defender_index]
         del defender_list[defender_index]
-        del defender_locations[defender_index]  # Ensure that we remove both piece and location
-        attacker_locations[attacker_index] = captured_location  # Assign new location to attacker
-        # Re-check for win condition
+        del defender_locations[defender_index]
+        attacker_locations[attacker_index] = captured_location
         winner = check_win()
         if winner:
             print(f"{winner} wins!")
@@ -177,7 +170,6 @@ def capture_logic(attacker_index, attacker_list, attacker_locations, defender_in
         captured_piece = attacker_list[attacker_index]
         del attacker_list[attacker_index]
         del attacker_locations[attacker_index]
-        # Re-check for win condition
         winner = check_win()
         if winner:
             print(f"{winner} wins!")
@@ -186,13 +178,11 @@ def capture_logic(attacker_index, attacker_list, attacker_locations, defender_in
         return captured_piece
 
     elif result == 'both':
-        # Both pieces are removed
-        captured_location = defender_locations[defender_index]  # Store location for attacker
+        captured_location = defender_locations[defender_index]
         del attacker_list[attacker_index]
         del attacker_locations[attacker_index]
         del defender_list[defender_index]
         del defender_locations[defender_index]
-        # Re-check for win condition
         winner = check_win()
         if winner:
             print(f"{winner} wins!")
@@ -201,83 +191,65 @@ def capture_logic(attacker_index, attacker_list, attacker_locations, defender_in
         return None
 
 
-
-
-
 def check_win():
-    # If both the Player's and Enemy's flags are missing, it's a draw
     if 'Flag' not in Player and 'Flag' not in Enemy:
         print("It's a draw! Both flags are captured.")
         pygame.quit()
         exit()
 
-    # If the Player's Flag is the only remaining piece
     if 'Flag' not in Player:
-        return "Enemy"  # Player lost because their Flag is captured
+        return "Enemy"
     if 'Flag' not in Enemy:
-        return "Player"  # Enemy lost because their Flag is captured
+        return "Player"
 
-    # If the Player's only piece is the Flag, they lose
     if len(Player) == 1 and 'Flag' in Player:
-        return "Enemy"  # Player loses if only the Flag is left
+        return "Enemy"
 
-    # If the Enemy's only piece is the Flag, they lose
     if len(Enemy) == 1 and 'Flag' in Enemy:
-        return "Player"  # Enemy loses if only the Flag is left
+        return "Player"
 
-    return None  # No winner yet
-
-
+    return None
 
 def evaluate_board():
-    # Check for win conditions first
-    if 'Flag' not in Player:  # If Player's flag is missing, the Player lost
-        return float('-inf')  # Prioritize Player losing (minimizing score)
-    if 'Flag' not in Enemy:  # If Enemy's flag is missing, the Player won
-        return float('inf')  # Prioritize Player winning (maximizing score)
+    if 'Flag' not in Player:
+        return float('inf')  # AI wins if player's flag is gone
+    if 'Flag' not in Enemy:
+        return float('-inf')  # Player wins if AI's flag is gone
 
-    # If only the AI's flag is left, it's a losing state
-    if len(Enemy) == 1 and 'Flag' in Enemy:
-        return float('-inf')  # AI loses if only the Flag is left
-
-    # If only the Player's flag is left, it's a losing state for the Player
-    if len(Player) == 1 and 'Flag' in Player:
-        return float('inf')  # Player loses if only the Flag is left
-
-    # Piece values adjusted for AI strategy
-    piece_values = {
-        'General': 4,
-        'Soldier': 2,
-        'Bomb': 1,
-        'Flag': 5  # Flag should have high priority in win conditions
-    }
-
-    # Evaluating Player and Enemy strength based on remaining pieces
-    player_strength = sum(piece_values.get(piece, 0) for piece in Player if piece != 'Flag')
+    piece_values = {'General': 4, 'Soldier': 2, 'Bomb': 1, 'Flag': 10}
+    player_strength = sum(piece_values.get(piece, 0) for piece in Player if piece in RevealedPlayerPieces)
     enemy_strength = sum(piece_values.get(piece, 0) for piece in Enemy if piece != 'Flag')
 
-    # Consider flag protection (the closer the enemy's flag is to being captured, the better for the AI)
-    player_flag_distance = sum(1 for loc in PlayerLocations if Player[PlayerLocations.index(loc)] == 'Flag')
-    enemy_flag_distance = sum(1 for loc in EnemyLocations if Enemy[EnemyLocations.index(loc)] == 'Flag')
+    # Handle hidden pieces as probabilities
+    unrevealed_pieces = len(Player) - len(RevealedPlayerPieces)
+    if unrevealed_pieces > 0:
+        average_piece_value = sum(piece_values.values()) / len(piece_values)
+        player_strength += unrevealed_pieces * average_piece_value
 
-    # Add additional penalties or rewards based on flag proximity or exposure
-    if 'Flag' in Player:
-        player_flag_distance = 0  # If the Player's flag is still in play, it doesn't add to the evaluation.
+    # Proximity to flags
+    ai_flag_pos = EnemyLocations[Enemy.index('Flag')]
+    player_flag_pos = PlayerLocations[Player.index('Flag')]
 
-    if 'Flag' in Enemy:
-        enemy_flag_distance = 0  # If the Enemy's flag is still in play, it doesn't add to the evaluation.
+    ai_proximity_to_player_flag = min(abs(loc[0] - player_flag_pos[0]) + abs(loc[1] - player_flag_pos[1])
+                                      for loc in EnemyLocations)
+    player_proximity_to_ai_flag = min(abs(loc[0] - ai_flag_pos[0]) + abs(loc[1] - ai_flag_pos[1])
+                                      for loc in PlayerLocations)
 
-    # Adding a penalty for the player being left with only the flag
-    if len(Player) == 1 and 'Flag' in Player:
-        player_strength -= 100  # Strong penalty to avoid losing
+    # Exposed flag penalties
+    ai_flag_exposed = any(abs(loc[0] - ai_flag_pos[0]) + abs(loc[1] - ai_flag_pos[1]) <= 1 for loc in PlayerLocations)
+    player_flag_exposed = any(abs(loc[0] - player_flag_pos[0]) + abs(loc[1] - player_flag_pos[1]) <= 1 for loc in EnemyLocations)
 
-    # Adding a penalty for the enemy being left with only the flag
-    if len(Enemy) == 1 and 'Flag' in Enemy:
-        enemy_strength -= 100  # Strong penalty to avoid losing
+    # Center control bonus
+    center_positions = [(1, 1), (1, 2), (2, 1), (2, 2)]
+    ai_center_control = sum(1 for loc in EnemyLocations if loc in center_positions)
+    player_center_control = sum(1 for loc in PlayerLocations if loc in center_positions)
 
-    return (player_strength - enemy_strength) + (player_flag_distance - enemy_flag_distance)
+    score = (enemy_strength - player_strength) + \
+            (5 * (ai_proximity_to_player_flag - player_proximity_to_ai_flag)) + \
+            (-10 if ai_flag_exposed else 0) + (10 if player_flag_exposed else 0) + \
+            (3 * (ai_center_control - player_center_control))
 
-
+    return score
 
 
 
@@ -285,7 +257,7 @@ def minimax(depth, maximizing_player, alpha=float('-inf'), beta=float('inf')):
     if depth == 0 or not Player or not Enemy:
         return evaluate_board()
 
-    if maximizing_player:  # Enemy's turn (maximize score)
+    if maximizing_player:
         max_eval = float('-inf')
         for i in range(len(EnemyLocations)):
             moves = check_move(EnemyLocations[i], 'Enemy')
@@ -293,23 +265,19 @@ def minimax(depth, maximizing_player, alpha=float('-inf'), beta=float('inf')):
                 original_pos = EnemyLocations[i]
                 EnemyLocations[i] = move
 
-                # Check if the move directly targets the Player's Flag
+                # Check if the move captures the player's flag
                 if move in PlayerLocations and Player[PlayerLocations.index(move)] == 'Flag':
-                    move_value = float('inf')  # Prioritize capturing the Flag
+                    move_value = float('inf')  # Immediate win
                 else:
                     move_value = minimax(depth - 1, False, alpha, beta)
 
                 EnemyLocations[i] = original_pos
-
                 max_eval = max(max_eval, move_value)
                 alpha = max(alpha, max_eval)
-
-                # Beta pruning
                 if beta <= alpha:
                     break
         return max_eval
-
-    else:  # Player's turn (minimize score)
+    else:
         min_eval = float('inf')
         for i in range(len(PlayerLocations)):
             moves = check_move(PlayerLocations[i], 'Player')
@@ -320,20 +288,16 @@ def minimax(depth, maximizing_player, alpha=float('-inf'), beta=float('inf')):
                 PlayerLocations[i] = original_pos
                 min_eval = min(min_eval, eval)
                 beta = min(beta, min_eval)
-
-                # Alpha pruning
                 if beta <= alpha:
                     break
         return min_eval
 
-
-
-
-def enemy_ai():
-    global selection, ValidMoves, turn
-
+    
+def enemy_turn():
+    global turn
+    best_score = float('-inf')
     best_move = None
-    best_value = float('-inf')
+    best_index = None
 
     for i in range(len(EnemyLocations)):
         moves = check_move(EnemyLocations[i], 'Enemy')
@@ -341,89 +305,86 @@ def enemy_ai():
             original_pos = EnemyLocations[i]
             EnemyLocations[i] = move
 
-            # Check if the move directly targets the Player's Flag
-            if move in PlayerLocations and Player[PlayerLocations.index(move)] == 'Flag':
-                move_value = float('inf')  # Prioritize capturing the Flag
+            # Prioritize capturing the player's flag
+            if move in PlayerLocations:
+                target_index = PlayerLocations.index(move)
+                target_piece = Player[target_index]
+                if target_piece == 'Flag':
+                    move_value = float('inf')  # Immediate win
+                else:
+                    move_value = minimax(3, False)  # Explore deeper
             else:
-                move_value = minimax(4, False, alpha=float('-inf'), beta=float('inf'))  # Adjust depth here
+                # Handle proximity to flags dynamically
+                move_value = minimax(3, False)
 
             EnemyLocations[i] = original_pos
+            if move_value > best_score:
+                best_score = move_value
+                best_move = move
+                best_index = i
 
-            if move_value > best_value:
-                best_value = move_value
-                best_move = (i, move)
-
-    if best_move:
-        piece_index, move = best_move
-        target_index = None
-
-        if move in PlayerLocations:
-            target_index = PlayerLocations.index(move)
-
-        if target_index is not None:
-            capture_logic(piece_index, Enemy, EnemyLocations, target_index, Player, PlayerLocations)
+    # Execute the best move
+    if best_move and best_index is not None:
+        if best_move in PlayerLocations:
+            target_index = PlayerLocations.index(best_move)
+            capture_logic(best_index, Enemy, EnemyLocations, target_index, Player, PlayerLocations)
         else:
-            EnemyLocations[piece_index] = move
-
-    winner = check_win()
-    if winner:
-        print(f"{winner} wins!")
-        pygame.quit()
-        exit()
+            EnemyLocations[best_index] = best_move
 
     turn += 1
 
 
 
-Playeroptions = [check_move(loc, 'Player') for loc in PlayerLocations]
-Enemyoptions = [check_move(loc, 'Enemy') for loc in EnemyLocations]
 
-run = True
-while run:
-    Timer.tick(Fps)
-    Screen.fill("dark grey")
-    draw_board()
-    draw_pieces()
+def player_turn_events():
+    global selection, turn, ValidMoves
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            run = False
+            pygame.quit()
+            exit()
 
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            x_coord = event.pos[0] // 100
-            y_coord = event.pos[1] // 100
-            click_coords = (x_coord, y_coord)
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            x, y = pygame.mouse.get_pos()
+            grid_pos = (x // 100, y // 100)
 
-            if turn % 2 == 0:  # Player's turn
-                if click_coords in PlayerLocations:
-                    selection = PlayerLocations.index(click_coords) if check_move(click_coords, 'Player') else 100
-                elif click_coords in ValidMoves and selection != 100:
-                    target_index = None
-
-                    if click_coords in EnemyLocations:
-                        target_index = EnemyLocations.index(click_coords)
-
-                    if target_index is not None:
+            if turn % 2 == 0:
+                if selection == 100:
+                    if grid_pos in PlayerLocations:
+                        selection = PlayerLocations.index(grid_pos)
+                        ValidMoves = check_move(grid_pos, 'Player')
+                elif grid_pos in ValidMoves:
+                    if grid_pos in EnemyLocations:
+                        target_index = EnemyLocations.index(grid_pos)
                         capture_logic(selection, Player, PlayerLocations, target_index, Enemy, EnemyLocations)
                     else:
-                        PlayerLocations[selection] = click_coords
-
-                    # Check for win condition after Player's move
-                    winner = check_win()
-                    if winner:
-                        print(f"{winner} wins!")
-                        pygame.quit()
-                        exit()
+                        PlayerLocations[selection] = grid_pos
 
                     selection = 100
+                    ValidMoves = []
                     turn += 1
+                else:
+                    selection = 100
+                    ValidMoves = []
 
-    if turn % 2 == 1:
-        enemy_ai()
-        Playeroptions = [check_move(loc, 'Player') for loc in PlayerLocations]
-        Enemyoptions = [check_move(loc, 'Enemy') for loc in EnemyLocations]
 
-    ValidMoves = check_move(PlayerLocations[selection], 'Player') if turn % 2 == 0 and 0 <= selection < len(PlayerLocations) else []
-    pygame.display.flip()
+def main_game_loop():
+    global turn
+    running = True
 
-pygame.quit()
+    while running:
+        Screen.fill('white')
+        draw_board()
+        draw_pieces()
+
+        if turn % 2 == 0:
+            player_turn_events()
+        else:
+            enemy_turn()
+
+        pygame.display.flip()
+        Timer.tick(Fps)
+
+
+if __name__ == "__main__":
+    main_game_loop()
